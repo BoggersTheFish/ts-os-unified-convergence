@@ -17,15 +17,19 @@ import json
 import time
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 try:
-    from streamlit_cytoscape import st_cytoscape
+    # The PyPI package exports the *function* `streamlit_cytoscape` (not `st_cytoscape`,
+    # which is a submodule — calling it caused TypeError: 'module' object is not callable).
+    from streamlit_cytoscape import NodeStyle, streamlit_cytoscape
 except ImportError:  # pragma: no cover - optional until deps installed
-    st_cytoscape = None
+    NodeStyle = None  # type: ignore[misc, assignment]
+    streamlit_cytoscape = None
 
 from boggers.core.config import DEFAULT_CONFIG
 from boggers.graph.seed import HISTORICAL_REPOS, seed_historical_nodes
@@ -41,74 +45,56 @@ def _default_db_path() -> Path:
     return root / "universal_living_graph.db"
 
 
-def _graph_elements(store: GraphStore) -> list[dict]:
-    nodes = store.list_nodes()
-    edges = store.list_edges()
-    elems: list[dict] = []
-    for n in nodes:
-        label = n.repo_id or f"node-{n.id}"
-        elems.append(
+def _graph_elements(store: GraphStore) -> dict[str, Any]:
+    """
+    Build the `elements` dict expected by streamlit-cytoscape: separate `nodes` and `edges`
+    arrays (Cytoscape.js JSON), each item shaped as `{"data": {...}}`.
+    """
+    rows = store.list_nodes()
+    edge_rows = store.list_edges()
+    cy_nodes: list[dict[str, Any]] = []
+    for n in rows:
+        display = (n.repo_id or f"node-{n.id}")[:42]
+        # `label` in data is the style group key (see NodeStyle(label=...)).
+        cy_nodes.append(
             {
                 "data": {
                     "id": str(n.id),
-                    "label": label[:42],
+                    "label": n.node_type,
+                    "display_name": display,
                     "activation": n.activation,
-                    "type": n.node_type,
                 }
             }
         )
+    cy_edges: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str]] = set()
-    for s, t, w, et in edges:
+    for s, t, w, et in edge_rows:
         key = (str(s), str(t), et)
         if key in seen:
             continue
         seen.add(key)
-        elems.append(
+        cy_edges.append(
             {
                 "data": {
                     "id": f"e-{s}-{t}-{et}",
                     "source": str(s),
                     "target": str(t),
                     "weight": w,
+                    "label": et,
                 }
             }
         )
-    return elems
+    return {"nodes": cy_nodes, "edges": cy_edges}
 
 
-def _cytoscape_stylesheet() -> list[dict]:
+def _graph_node_styles() -> list[Any]:
+    """NodeStyle groups match the `label` field on each node's data (node_type)."""
+    if NodeStyle is None:
+        return []
     return [
-        {
-            "selector": "node",
-            "style": {
-                "label": "data(label)",
-                "width": 46,
-                "height": 46,
-                "background-color": "#5b8cff",
-                "color": "#ffffff",
-                "text-valign": "center",
-                "text-halign": "center",
-                "font-size": "10px",
-            },
-        },
-        {
-            "selector": "node[type = 'historical']",
-            "style": {"background-color": "#00c896"},
-        },
-        {
-            "selector": "node[type = 'synthesized']",
-            "style": {"background-color": "#ff7b54"},
-        },
-        {
-            "selector": "edge",
-            "style": {
-                "width": 2,
-                "line-color": "#9aa7c7",
-                "curve-style": "bezier",
-                "target-arrow-shape": "triangle",
-                "arrow-scale": 0.8,
-            },
-        },
+        NodeStyle(label="historical", color="#00c896", caption="display_name"),
+        NodeStyle(label="synthesized", color="#ff7b54", caption="display_name"),
+        NodeStyle(label="concept", color="#5b8cff", caption="display_name"),
     ]
 
 
@@ -188,20 +174,25 @@ def main() -> None:
 
     st.subheader("Living graph (Cytoscape)")
     elems = _graph_elements(store)
-    layout = {"name": "circle" if len(elems) < 80 else "cose"}
-    if st_cytoscape is not None:
-        st_cytoscape(
+    n_nodes = len(elems["nodes"])
+    layout_name = "circle" if n_nodes < 80 else "cose"
+    if streamlit_cytoscape is not None:
+        streamlit_cytoscape(
             elems,
-            layout=layout,
-            stylesheet=_cytoscape_stylesheet(),
-            height="520px",
-            user_zooming_enabled=True,
-            user_panning_enabled=True,
-            box_selection_enabled=True,
+            layout=layout_name,
+            node_styles=_graph_node_styles(),
+            height=520,
+            key="tsos-universal-graph",
         )
     else:
         st.warning("Install `streamlit-cytoscape` for interactive graph rendering.")
-        st.json({"elements": elems[:40], "truncated": len(elems) > 40})
+        st.json(
+            {
+                "nodes_preview": elems["nodes"][:20],
+                "edges_preview": elems["edges"][:20],
+                "truncated": n_nodes > 20,
+            }
+        )
 
     st.subheader("Tension + evolution")
     c1, c2 = st.columns(2)

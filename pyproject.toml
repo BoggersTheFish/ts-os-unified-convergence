@@ -1,0 +1,41 @@
+[build-system]
+requires = ["maturin>=1.5,<2"]
+build-backend = "maturin"
+
+[project]
+name = "ts-os-unified-convergence"
+version = "17.0.0"
+description = "TS-OS Unified Convergence — Wave 17: one living graph from 24 historical repos."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "BoggersTheFish / TS-OS Convergence" }]
+dependencies = [
+  "numpy>=1.24",
+  "httpx>=0.27",
+  "streamlit>=1.32",
+  "streamlit-cytoscape>=0.1.5",
+  "pandas>=2.0",
+  "plotly>=5.18",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=4.1",
+  "ruff>=0.3",
+]
+
+[tool.maturin]
+manifest-path = "rust_wave/Cargo.toml"
+module-name = "rust_wave.rust_wave"
+python-source = "src"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

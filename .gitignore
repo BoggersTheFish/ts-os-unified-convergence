@@ -1,0 +1,23 @@
+# TS-OS Unified Convergence — local artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.so
+*.pyd
+*.pdb
+target/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+venv/
+.venv/
+.env
+*.db
+*.sqlite
+*.sqlite3
+.DS_Store
+htmlcov/
+.coverage

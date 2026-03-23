@@ -1,3 +1,8 @@
+<image-card alt="Python" src="https://img.shields.io/badge/Python-3.10+-blue" ></image-card>
+<image-card alt="Rust" src="https://img.shields.io/badge/Rust-PyO3-orange" ></image-card>
+<image-card alt="Streamlit" src="https://img.shields.io/badge/Streamlit-Demo-green" ></image-card>
+
+
 # TS-OS Unified Convergence
 
 **This is the Convergence Wave — every past repo has now evolved into one.**
